@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "swin3d-medical-classification"
+version = "0.1.0"
+description = "Single-sequence 3D medical image classification with torchvision swin3d_s."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "torch==2.5.1",
+    "torchvision==0.20.1",
+    "monai==1.4.0",
+    "pandas==2.2.3",
+    "numpy==1.26.4",
+    "scikit-learn==1.5.2",
+    "openpyxl==3.1.5",
+]

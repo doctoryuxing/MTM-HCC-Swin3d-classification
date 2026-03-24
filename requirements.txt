@@ -1,0 +1,7 @@
+torch==2.5.1
+torchvision==0.20.1
+monai==1.4.0
+pandas==2.2.3
+numpy==1.26.4
+scikit-learn==1.5.2
+openpyxl==3.1.5
