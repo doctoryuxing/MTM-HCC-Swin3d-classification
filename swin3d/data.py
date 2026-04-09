@@ -6,6 +6,7 @@ from monai.transforms import (
     EnsureChannelFirstd,
     EnsureTyped,
     LoadImaged,
+    RandAffined,
     RandFlipd,
     RandRotate90d,
     RandShiftIntensityd,
@@ -56,6 +57,7 @@ def get_transforms(config: TrainingConfig):
                 RandRotate90d(keys=["image"], prob=0.3, spatial_axes=[0, 1]),
                 RandFlipd(keys=["image"], prob=0.5, spatial_axis=0),
                 RandZoomd(keys=["image"], prob=0.3, min_zoom=0.9, max_zoom=1.1),
+                RandAffined(keys=["image"], prob=0.3, rotate_range=(0.1, 0.1, 0.1), translate_range=(5, 5, 5), scale_range=(0.1, 0.1, 0.1)),
                 RandShiftIntensityd(keys=["image"], offsets=0.1, prob=0.5),
                 EnsureTyped(keys=["image"]),
             ]

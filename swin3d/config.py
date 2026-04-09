@@ -27,6 +27,11 @@ class TrainingConfig:
     use_focal_loss: bool = True
     focal_gamma: float = 3.0
     focal_alpha: list[float] = field(default_factory=lambda: [0.3, 0.7])
+    # Fine-tuning configuration
+    finetune_last_stage: bool = True       # Unfreeze last Stage + PatchMerging + Norm
+    backbone_lr: float = 1e-5              # Learning rate for backbone trainable layers (1/10 of head lr)
+    weight_decay: float = 1e-4             # Adam weight decay
+
     results_dir: str = "outputs"
     save_best_model: bool = True
     cuda_launch_blocking: bool = True

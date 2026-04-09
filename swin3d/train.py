@@ -19,7 +19,7 @@ from torch.optim import lr_scheduler
 from .config import TrainingConfig
 from .data import get_transforms, load_dataset
 from .losses import FocalLoss
-from .model import build_model
+from .model import build_model, count_parameters, get_param_groups
 
 
 warnings.filterwarnings("ignore")
@@ -244,17 +244,22 @@ def parse_args():
     model_group.add_argument("--resize-z", type=int, default=16)
     model_group.add_argument("--intensity-min", type=float, default=0.0)
     model_group.add_argument("--intensity-max", type=float, default=2000.0)
+    model_group.add_argument("--no-finetune-last-stage", dest="finetune_last_stage", action="store_false")
+    model_group.add_argument("--finetune-last-stage", dest="finetune_last_stage", action="store_true")
+    model_group.add_argument("--backbone-lr", type=float, default=1e-5)
+    model_group.add_argument("--weight-decay", type=float, default=1e-4)
 
     augmentation_group = parser.add_argument_group("augmentation")
     augmentation_group.add_argument("--simple-augmentation", action="store_true")
 
     optimization_group = parser.add_argument_group("optimization")
     optimization_group.add_argument("--epochs", type=int, default=500)
-    optimization_group.add_argument("--batch-size", type=int, default=4)
+    optimization_group.add_argument("--batch-size", type=int, default=16)
     optimization_group.add_argument("--learning-rate", type=float, default=1e-4)
     optimization_group.add_argument("--num-workers", type=int, default=4)
     optimization_group.add_argument("--step-size", type=int, default=7)
     optimization_group.add_argument("--gamma", type=float, default=0.1)
+    optimization_group.set_defaults(finetune_last_stage=True)
 
     loss_group = parser.add_argument_group("loss")
     loss_group.add_argument("--no-focal-loss", action="store_true")
@@ -286,6 +291,9 @@ def parse_args():
         gamma=args.gamma,
         use_focal_loss=not args.no_focal_loss,
         focal_gamma=args.focal_gamma,
+        finetune_last_stage=args.finetune_last_stage,
+        backbone_lr=args.backbone_lr,
+        weight_decay=args.weight_decay,
         results_dir=args.results_dir,
     )
     return config, args.log_level
@@ -311,8 +319,11 @@ def main():
     logger.info("Backbone: %s", config.backbone_name)
     logger.info("Image size: %s", config.resized_shape)
     logger.info("Batch size: %s", config.batch_size)
-    logger.info("Learning rate: %s", config.learning_rate)
+    logger.info("Head LR: %s", config.learning_rate)
+    logger.info("Backbone LR: %s", config.backbone_lr)
+    logger.info("Weight decay: %s", config.weight_decay)
     logger.info("Number of epochs: %s", config.num_epochs)
+    logger.info("Finetune last stage: %s", config.finetune_last_stage)
     logger.info("Device: %s", config.device)
     logger.info("Results directory: %s", config.results_dir)
     logger.info("Log file: %s", config.log_path)
@@ -350,7 +361,15 @@ def main():
 
     logger.info("Building model...")
     model = build_model(config).to(config.device)
+    param_stats = count_parameters(model)
     logger.info("Model loaded to %s", config.device)
+    logger.info("Total params: %s", f"{param_stats['total']:,}")
+    logger.info("Trainable params: %s", f"{param_stats['trainable']:,}")
+    logger.info("Frozen params: %s", f"{param_stats['frozen']:,}")
+    if config.finetune_last_stage:
+        logger.info("Fine-tuning mode: last Stage + PatchMerging + Norm + Head")
+    else:
+        logger.info("Fine-tuning mode: Head only (linear probing)")
 
     if config.use_focal_loss:
         criterion = FocalLoss(gamma=config.focal_gamma, alpha=config.focal_alpha)
@@ -359,7 +378,8 @@ def main():
         criterion = nn.CrossEntropyLoss()
         logger.info("Using CrossEntropyLoss")
 
-    optimizer = torch.optim.Adam(model.head.parameters(), lr=config.learning_rate)
+    param_groups = get_param_groups(model, config)
+    optimizer = torch.optim.Adam(param_groups, weight_decay=config.weight_decay)
     scheduler = lr_scheduler.StepLR(optimizer, step_size=config.step_size, gamma=config.gamma)
 
     best_accuracy = 0.0
