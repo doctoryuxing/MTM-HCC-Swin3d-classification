@@ -128,4 +128,4 @@ The training script writes:
 
 - Input images are resized to `64 x 64 x 16` by default.
 - The script expands single-channel volumes to 3 channels before feeding `swin3d_s`.
-- Feature extractor parameters are frozen by default; only the classification head is optimized.
+- By default, the model freezes most feature extractor parameters and fine-tunes the last stage, final patch merging layer, norm layer, and classification head.
