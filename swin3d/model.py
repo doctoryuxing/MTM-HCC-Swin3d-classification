@@ -1,10 +1,10 @@
 import torch.nn as nn
-from torchvision.models.video import Swin3D_S_Weights, swin3d_s
+from torchvision.models.video import R3D_18_Weights, Swin3D_S_Weights, r3d_18, swin3d_s
 
 from .config import TrainingConfig
 
 
-def build_model(config: TrainingConfig) -> nn.Module:
+def _build_swin3d_model(config: TrainingConfig) -> nn.Module:
     """Build Swin3D-S classification model with partial fine-tuning support.
 
     Unfreezing strategy (finetune_last_stage=True):
@@ -39,16 +39,60 @@ def build_model(config: TrainingConfig) -> nn.Module:
     return model
 
 
+def _build_r3d18_model(config: TrainingConfig) -> nn.Module:
+    """Build R3D-18 (3D ResNet-18) classification model with partial fine-tuning support.
+
+    Unfreezing strategy (finetune_last_stage=True):
+        - layer4: last residual stage
+        - fc: new classification head nn.Linear(512, num_classes)
+
+    When finetune_last_stage=False, degrades to linear probing (fc only).
+    """
+    model = r3d_18(weights=R3D_18_Weights.DEFAULT)
+
+    # 1. Freeze all parameters
+    for parameter in model.parameters():
+        parameter.requires_grad = False
+
+    # 2. Unfreeze last residual stage
+    if config.finetune_last_stage:
+        for param in model.layer4.parameters():
+            param.requires_grad = True
+
+    # 3. Replace classification head (newly created layer has requires_grad=True by default)
+    model.fc = nn.Linear(model.fc.in_features, config.num_classes)
+
+    return model
+
+
+def build_model(config: TrainingConfig) -> nn.Module:
+    """Build a classification model based on config.backbone_name.
+
+    Supported backbones:
+        - ``swin3d_s``: Swin3D-Small (default)
+        - ``r3d_18``: 3D ResNet-18 (CNN)
+    """
+    if config.backbone_name == "r3d_18":
+        return _build_r3d18_model(config)
+    return _build_swin3d_model(config)
+
+
+def _head_attr(model: nn.Module) -> str:
+    """Return the name of the classification head attribute."""
+    return "head" if hasattr(model, "head") else "fc"
+
+
 def get_param_groups(model: nn.Module, config: TrainingConfig) -> list[dict]:
     """Create parameter groups with differential learning rates.
 
     - Head parameters: use config.learning_rate
     - Backbone trainable parameters: use config.backbone_lr (typically 1/10 of head lr)
     """
-    head_params = list(model.head.parameters())
+    attr = _head_attr(model)
+    head_params = list(getattr(model, attr).parameters())
     backbone_trainable_params = [
         param for name, param in model.named_parameters()
-        if param.requires_grad and not name.startswith("head")
+        if param.requires_grad and not name.startswith(attr)
     ]
 
     param_groups = []

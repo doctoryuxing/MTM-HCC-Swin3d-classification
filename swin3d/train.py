@@ -238,6 +238,8 @@ def parse_args():
     data_group.add_argument("--filename-delimiter", default="-")
 
     model_group = parser.add_argument_group("model")
+    model_group.add_argument("--backbone", choices=["swin3d_s", "r3d_18"], default="swin3d_s",
+                             dest="backbone_name", help="Backbone architecture (default: swin3d_s)")
     model_group.add_argument("--num-classes", type=int, default=2)
     model_group.add_argument("--resize-x", type=int, default=64)
     model_group.add_argument("--resize-y", type=int, default=64)
@@ -278,6 +280,7 @@ def parse_args():
         val_excel=args.val_excel,
         name_column=args.name_column,
         label_column=args.label_column,
+        backbone_name=args.backbone_name,
         num_classes=args.num_classes,
         resized_shape=(args.resize_x, args.resize_y, args.resize_z),
         intensity_range=(args.intensity_min, args.intensity_max),
@@ -314,7 +317,7 @@ def main():
         json.dump(asdict(config), handle, ensure_ascii=False, indent=2)
 
     logger.info("=" * 80)
-    logger.info("3D Medical Image Classification - Swin3D Small")
+    logger.info("3D Medical Image Classification - %s", config.backbone_name)
     logger.info("=" * 80)
     logger.info("Backbone: %s", config.backbone_name)
     logger.info("Image size: %s", config.resized_shape)
@@ -367,7 +370,10 @@ def main():
     logger.info("Trainable params: %s", f"{param_stats['trainable']:,}")
     logger.info("Frozen params: %s", f"{param_stats['frozen']:,}")
     if config.finetune_last_stage:
-        logger.info("Fine-tuning mode: last Stage + PatchMerging + Norm + Head")
+        if config.backbone_name == "r3d_18":
+            logger.info("Fine-tuning mode: layer4 + Head")
+        else:
+            logger.info("Fine-tuning mode: last Stage + PatchMerging + Norm + Head")
     else:
         logger.info("Fine-tuning mode: Head only (linear probing)")
 

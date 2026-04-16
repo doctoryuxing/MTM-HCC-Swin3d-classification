@@ -1,10 +1,10 @@
 # Swin3D Medical Classification
 
-PyTorch and MONAI project for single-sequence 3D medical image classification with `swin3d_s`.
+PyTorch and MONAI project for single-sequence 3D medical image classification. Supports multiple backbone architectures.
 
 ## Features
 
-- Fixed backbone: `torchvision.models.video.swin3d_s`
+- Selectable backbone: `torchvision.models.video.swin3d_s` (transformer) or `r3d_18` (3D ResNet-18 CNN)
 - Single-sequence 3D classification
 - Optional `FocalLoss` for class imbalance
 - Training / validation metrics: loss, accuracy, AUC, F1
@@ -93,6 +93,12 @@ python train.py \
   --results-dir /path/to/results
 ```
 
+Use the CNN backbone (3D ResNet-18) instead of Swin3D:
+
+```bash
+python train.py --backbone r3d_18
+```
+
 Show more verbose logs:
 
 ```bash
@@ -127,5 +133,6 @@ The training script writes:
 ## Notes
 
 - Input images are resized to `64 x 64 x 16` by default.
-- The script expands single-channel volumes to 3 channels before feeding `swin3d_s`.
-- By default, the model freezes most feature extractor parameters and fine-tunes the last stage, final patch merging layer, norm layer, and classification head.
+- The script expands single-channel volumes to 3 channels before feeding the backbone.
+- For `swin3d_s`: by default, the model freezes most feature extractor parameters and fine-tunes the last stage, final patch merging layer, norm layer, and classification head.
+- For `r3d_18`: by default, the model freezes all layers except the last residual stage (`layer4`) and the classification head.
